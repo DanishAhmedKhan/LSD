@@ -1,0 +1,351 @@
+
+ //@version=5
+indicator("LSD", overlay=true, max_boxes_count=500)
+
+
+tapLookahead = input.int(100, "Maximum candles to find tap", minval=1, maxval=500)
+
+showSupply = input.bool(true, "Show Supply Zones")
+showDemand = input.bool(true, "Show Demand Zones")
+
+supplyBorderColor = color.red
+supplyFillColor = color.new(color.red, 85)
+
+demandBorderColor = color.green
+demandFillColor = color.new(color.green, 85)
+
+bullish = close > open
+bearish = close < open
+
+// PENDING SUPPLY CANDIDATES
+var float[] pendingSupplyHighs = array.new_float()
+var float[] pendingSupplyLows = array.new_float()
+var int[] pendingSupplyBars = array.new_int()
+
+// PENDING DEMAND CANDIDATES
+var float[] pendingDemandHighs = array.new_float()
+var float[] pendingDemandLows = array.new_float()
+var int[] pendingDemandBars = array.new_int()
+
+// ACTIVE SUPPLY ZONES
+var float[] supplyHighs = array.new_float()
+var float[] supplyLows = array.new_float()
+var int[] supplyCandidateBars = array.new_int()
+var int[] supplyBreakoutBars = array.new_int()
+var int[] supplyAfterBars = array.new_int()
+var bool[] supplyRetestSeen = array.new_bool()
+
+// ACTIVE DEMAND ZONES
+var float[] demandHighs = array.new_float()
+var float[] demandLows = array.new_float()
+var int[] demandCandidateBars = array.new_int()
+var int[] demandBreakoutBars = array.new_int()
+var int[] demandAfterBars = array.new_int()
+var bool[] demandRetestSeen = array.new_bool()
+
+if barstate.isconfirmed
+
+    // SUPPLY CANDIDATES: BEARISH CANDLES
+    if showSupply and bearish
+        i = array.size(pendingSupplyHighs) - 1
+
+        while i >= 0
+            oldHigh = array.get(pendingSupplyHighs, i)
+            oldLow = array.get(pendingSupplyLows, i)
+
+            wickAbove = high > oldHigh
+            wickBelow = low < oldLow
+            insideOldZone = high <= oldHigh and low >= oldLow
+
+            if wickAbove or wickBelow or insideOldZone
+                array.remove(pendingSupplyHighs, i)
+                array.remove(pendingSupplyLows, i)
+                array.remove(pendingSupplyBars, i)
+
+            i -= 1
+
+        array.push(pendingSupplyHighs, high)
+        array.push(pendingSupplyLows, low)
+        array.push(pendingSupplyBars, bar_index)
+
+    // DEMAND CANDIDATES: BULLISH CANDLES
+    if showDemand and bullish
+        i = array.size(pendingDemandHighs) - 1
+
+        while i >= 0
+            oldHigh = array.get(pendingDemandHighs, i)
+            oldLow = array.get(pendingDemandLows, i)
+
+            wickAbove = high > oldHigh
+            wickBelow = low < oldLow
+            insideOldZone = high <= oldHigh and low >= oldLow
+
+            if wickAbove or wickBelow or insideOldZone
+                array.remove(pendingDemandHighs, i)
+                array.remove(pendingDemandLows, i)
+                array.remove(pendingDemandBars, i)
+
+            i -= 1
+
+        array.push(pendingDemandHighs, high)
+        array.push(pendingDemandLows, low)
+        array.push(pendingDemandBars, bar_index)
+
+if barstate.isconfirmed
+
+    // SUPPLY BREAKOUT: CLOSE ABOVE CANDIDATE HIGH
+    if array.size(pendingSupplyHighs) > 0
+        i = array.size(pendingSupplyHighs) - 1
+
+        while i >= 0
+            candidateHigh = array.get(pendingSupplyHighs, i)
+            candidateLow = array.get(pendingSupplyLows, i)
+            candidateBar = array.get(pendingSupplyBars, i)
+
+            if bar_index > candidateBar
+                if close > candidateHigh
+                    array.push(supplyHighs, candidateHigh)
+                    array.push(supplyLows, candidateLow)
+                    array.push(supplyCandidateBars, candidateBar)
+                    array.push(supplyBreakoutBars, bar_index)
+                    array.push(supplyAfterBars, na)
+                    array.push(supplyRetestSeen, false)
+
+                    array.remove(pendingSupplyHighs, i)
+                    array.remove(pendingSupplyLows, i)
+                    array.remove(pendingSupplyBars, i)
+
+                else if close < candidateLow
+                    array.remove(pendingSupplyHighs, i)
+                    array.remove(pendingSupplyLows, i)
+                    array.remove(pendingSupplyBars, i)
+
+            i -= 1
+
+    // DEMAND BREAKOUT: CLOSE BELOW CANDIDATE LOW
+    if array.size(pendingDemandHighs) > 0
+        i = array.size(pendingDemandHighs) - 1
+
+        while i >= 0
+            candidateHigh = array.get(pendingDemandHighs, i)
+            candidateLow = array.get(pendingDemandLows, i)
+            candidateBar = array.get(pendingDemandBars, i)
+
+            if bar_index > candidateBar
+                if close < candidateLow
+                    array.push(demandHighs, candidateHigh)
+                    array.push(demandLows, candidateLow)
+                    array.push(demandCandidateBars, candidateBar)
+                    array.push(demandBreakoutBars, bar_index)
+                    array.push(demandAfterBars, na)
+                    array.push(demandRetestSeen, false)
+
+                    array.remove(pendingDemandHighs, i)
+                    array.remove(pendingDemandLows, i)
+                    array.remove(pendingDemandBars, i)
+
+                else if close > candidateHigh
+                    array.remove(pendingDemandHighs, i)
+                    array.remove(pendingDemandLows, i)
+                    array.remove(pendingDemandBars, i)
+
+            i -= 1
+
+ // ======================================================
+ // SUPPLY ZONE CONFIRMATION AND TAP DETECTION
+ // ======================================================
+
+if barstate.isconfirmed and array.size(supplyHighs) > 0
+    i = array.size(supplyHighs) - 1
+
+    while i >= 0
+        candidateHigh = array.get(supplyHighs, i)
+        candidateLow = array.get(supplyLows, i)
+        candidateBar = array.get(supplyCandidateBars, i)
+        breakoutBar = array.get(supplyBreakoutBars, i)
+        afterBar = array.get(supplyAfterBars, i)
+        retestSeen = array.get(supplyRetestSeen, i)
+
+        if na(afterBar)
+            // Wait until after the breakout candle.
+            if bar_index > breakoutBar
+
+                // Invalidate if the close returns below the top.
+                if close < candidateHigh
+                    array.remove(supplyHighs, i)
+                    array.remove(supplyLows, i)
+                    array.remove(supplyCandidateBars, i)
+                    array.remove(supplyBreakoutBars, i)
+                    array.remove(supplyAfterBars, i)
+                    array.remove(supplyRetestSeen, i)
+
+                // Confirmation: the entire candle is above the zone.
+                else if low > candidateHigh
+                    if retestSeen
+                        array.remove(supplyHighs, i)
+                        array.remove(supplyLows, i)
+                        array.remove(supplyCandidateBars, i)
+                        array.remove(supplyBreakoutBars, i)
+                        array.remove(supplyAfterBars, i)
+                        array.remove(supplyRetestSeen, i)
+                    else
+                        // Start the tap window after confirmation.
+                        array.set(supplyAfterBars, i, bar_index)
+
+                // Track a bearish retest before confirmation.
+                else if bearish and low < candidateHigh
+                    array.set(supplyRetestSeen, i, true)
+
+        else
+            barsSinceAfter = bar_index - afterBar
+
+            // The confirmation candle itself cannot be the tap.
+            if barsSinceAfter > 0
+
+                // A close inside the zone invalidates it.
+                if close <= candidateHigh and close >= candidateLow
+                    array.remove(supplyHighs, i)
+                    array.remove(supplyLows, i)
+                    array.remove(supplyCandidateBars, i)
+                    array.remove(supplyBreakoutBars, i)
+                    array.remove(supplyAfterBars, i)
+                    array.remove(supplyRetestSeen, i)
+
+                // A close through the bottom invalidates it too.
+                else if close < candidateLow
+                    array.remove(supplyHighs, i)
+                    array.remove(supplyLows, i)
+                    array.remove(supplyCandidateBars, i)
+                    array.remove(supplyBreakoutBars, i)
+                    array.remove(supplyAfterBars, i)
+                    array.remove(supplyRetestSeen, i)
+
+                // Valid tap from above:
+                // wick below the top, close above the top.
+                else if low < candidateHigh and close > candidateHigh
+                    box.new(
+                         left=candidateBar,
+                         top=candidateHigh,
+                         right=bar_index,
+                         bottom=candidateLow,
+                         border_color=supplyBorderColor,
+                         border_style=line.style_solid,
+                         bgcolor=supplyFillColor)
+
+                    array.remove(supplyHighs, i)
+                    array.remove(supplyLows, i)
+                    array.remove(supplyCandidateBars, i)
+                    array.remove(supplyBreakoutBars, i)
+                    array.remove(supplyAfterBars, i)
+                    array.remove(supplyRetestSeen, i)
+
+                // Expire if no valid tap occurs within the window.
+                else if barsSinceAfter >= tapLookahead
+                    array.remove(supplyHighs, i)
+                    array.remove(supplyLows, i)
+                    array.remove(supplyCandidateBars, i)
+                    array.remove(supplyBreakoutBars, i)
+                    array.remove(supplyAfterBars, i)
+                    array.remove(supplyRetestSeen, i)
+
+        i -= 1
+
+
+// ======================================================
+// DEMAND ZONE CONFIRMATION AND TAP DETECTION
+// ======================================================
+
+if barstate.isconfirmed and array.size(demandHighs) > 0
+    i = array.size(demandHighs) - 1
+
+    while i >= 0
+        candidateHigh = array.get(demandHighs, i)
+        candidateLow = array.get(demandLows, i)
+        candidateBar = array.get(demandCandidateBars, i)
+        breakoutBar = array.get(demandBreakoutBars, i)
+        afterBar = array.get(demandAfterBars, i)
+        retestSeen = array.get(demandRetestSeen, i)
+
+        if na(afterBar)
+            // Wait until after the breakout candle.
+            if bar_index > breakoutBar
+
+                // Invalidate if the close returns above the bottom.
+                if close > candidateLow
+                    array.remove(demandHighs, i)
+                    array.remove(demandLows, i)
+                    array.remove(demandCandidateBars, i)
+                    array.remove(demandBreakoutBars, i)
+                    array.remove(demandAfterBars, i)
+                    array.remove(demandRetestSeen, i)
+
+                // Confirmation: the entire candle is below the zone.
+                else if high < candidateLow
+                    if retestSeen
+                        array.remove(demandHighs, i)
+                        array.remove(demandLows, i)
+                        array.remove(demandCandidateBars, i)
+                        array.remove(demandBreakoutBars, i)
+                        array.remove(demandAfterBars, i)
+                        array.remove(demandRetestSeen, i)
+                    else
+                        // Start the tap window after confirmation.
+                        array.set(demandAfterBars, i, bar_index)
+
+                // Track a bullish retest before confirmation.
+                else if bullish and high > candidateLow
+                    array.set(demandRetestSeen, i, true)
+
+        else
+            barsSinceAfter = bar_index - afterBar
+
+            // The confirmation candle itself cannot be the tap.
+            if barsSinceAfter > 0
+
+                // A close inside the zone invalidates it.
+                if close >= candidateLow and close <= candidateHigh
+                    array.remove(demandHighs, i)
+                    array.remove(demandLows, i)
+                    array.remove(demandCandidateBars, i)
+                    array.remove(demandBreakoutBars, i)
+                    array.remove(demandAfterBars, i)
+                    array.remove(demandRetestSeen, i)
+
+                // A close through the top invalidates it too.
+                else if close > candidateHigh
+                    array.remove(demandHighs, i)
+                    array.remove(demandLows, i)
+                    array.remove(demandCandidateBars, i)
+                    array.remove(demandBreakoutBars, i)
+                    array.remove(demandAfterBars, i)
+                    array.remove(demandRetestSeen, i)
+
+                // Valid tap from below:
+                // wick above the bottom, close below the bottom.
+                else if high > candidateLow and close < candidateLow
+                    box.new(
+                         left=candidateBar,
+                         top=candidateHigh,
+                         right=bar_index,
+                         bottom=candidateLow,
+                         border_color=demandBorderColor,
+                         border_style=line.style_solid,
+                         bgcolor=demandFillColor)
+
+                    array.remove(demandHighs, i)
+                    array.remove(demandLows, i)
+                    array.remove(demandCandidateBars, i)
+                    array.remove(demandBreakoutBars, i)
+                    array.remove(demandAfterBars, i)
+                    array.remove(demandRetestSeen, i)
+
+                // Expire if no valid tap occurs within the window.
+                else if barsSinceAfter >= tapLookahead
+                    array.remove(demandHighs, i)
+                    array.remove(demandLows, i)
+                    array.remove(demandCandidateBars, i)
+                    array.remove(demandBreakoutBars, i)
+                    array.remove(demandAfterBars, i)
+                    array.remove(demandRetestSeen, i)
+
+        i -= 1

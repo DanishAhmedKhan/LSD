@@ -1,0 +1,60 @@
+
+if barstate.isconfirmed
+
+    // SUPPLY BREAKOUT: CLOSE ABOVE CANDIDATE HIGH
+    if array.size(pendingSupplyHighs) > 0
+        i = array.size(pendingSupplyHighs) - 1
+
+        while i >= 0
+            candidateHigh = array.get(pendingSupplyHighs, i)
+            candidateLow = array.get(pendingSupplyLows, i)
+            candidateBar = array.get(pendingSupplyBars, i)
+
+            if bar_index > candidateBar
+                if close > candidateHigh
+                    array.push(supplyHighs, candidateHigh)
+                    array.push(supplyLows, candidateLow)
+                    array.push(supplyCandidateBars, candidateBar)
+                    array.push(supplyBreakoutBars, bar_index)
+                    array.push(supplyAfterBars, na)
+                    array.push(supplyRetestSeen, false)
+
+                    array.remove(pendingSupplyHighs, i)
+                    array.remove(pendingSupplyLows, i)
+                    array.remove(pendingSupplyBars, i)
+
+                else if close < candidateLow
+                    array.remove(pendingSupplyHighs, i)
+                    array.remove(pendingSupplyLows, i)
+                    array.remove(pendingSupplyBars, i)
+
+            i -= 1
+
+    // DEMAND BREAKOUT: CLOSE BELOW CANDIDATE LOW
+    if array.size(pendingDemandHighs) > 0
+        i = array.size(pendingDemandHighs) - 1
+
+        while i >= 0
+            candidateHigh = array.get(pendingDemandHighs, i)
+            candidateLow = array.get(pendingDemandLows, i)
+            candidateBar = array.get(pendingDemandBars, i)
+
+            if bar_index > candidateBar
+                if close < candidateLow
+                    array.push(demandHighs, candidateHigh)
+                    array.push(demandLows, candidateLow)
+                    array.push(demandCandidateBars, candidateBar)
+                    array.push(demandBreakoutBars, bar_index)
+                    array.push(demandAfterBars, na)
+                    array.push(demandRetestSeen, false)
+
+                    array.remove(pendingDemandHighs, i)
+                    array.remove(pendingDemandLows, i)
+                    array.remove(pendingDemandBars, i)
+
+                else if close > candidateHigh
+                    array.remove(pendingDemandHighs, i)
+                    array.remove(pendingDemandLows, i)
+                    array.remove(pendingDemandBars, i)
+
+            i -= 1

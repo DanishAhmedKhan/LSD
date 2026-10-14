@@ -1,0 +1,11 @@
+
+tapLookahead = input.int(100, "Maximum candles to find tap", minval=1, maxval=500)
+
+showSupply = input.bool(true, "Show Supply Zones")
+showDemand = input.bool(true, "Show Demand Zones")
+
+supplyBorderColor = color.red
+supplyFillColor = color.new(color.red, 85)
+
+demandBorderColor = color.green
+demandFillColor = color.new(color.green, 85)

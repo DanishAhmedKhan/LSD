@@ -1,0 +1,29 @@
+
+bullish = close > open
+bearish = close < open
+
+// PENDING SUPPLY CANDIDATES
+var float[] pendingSupplyHighs = array.new_float()
+var float[] pendingSupplyLows = array.new_float()
+var int[] pendingSupplyBars = array.new_int()
+
+// PENDING DEMAND CANDIDATES
+var float[] pendingDemandHighs = array.new_float()
+var float[] pendingDemandLows = array.new_float()
+var int[] pendingDemandBars = array.new_int()
+
+// ACTIVE SUPPLY ZONES
+var float[] supplyHighs = array.new_float()
+var float[] supplyLows = array.new_float()
+var int[] supplyCandidateBars = array.new_int()
+var int[] supplyBreakoutBars = array.new_int()
+var int[] supplyAfterBars = array.new_int()
+var bool[] supplyRetestSeen = array.new_bool()
+
+// ACTIVE DEMAND ZONES
+var float[] demandHighs = array.new_float()
+var float[] demandLows = array.new_float()
+var int[] demandCandidateBars = array.new_int()
+var int[] demandBreakoutBars = array.new_int()
+var int[] demandAfterBars = array.new_int()
+var bool[] demandRetestSeen = array.new_bool()

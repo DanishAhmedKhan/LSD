@@ -1,0 +1,9 @@
+
+ //@version=5
+indicator("LSD", overlay=true, max_boxes_count=500)
+
+// @include src/settings.pine
+// @include src/state.pine
+// @include src/candidate_detection.pine
+// @include src/breakout_detection.pine
+// @include src/zone_confirmation.pine
