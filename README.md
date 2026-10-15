@@ -6,7 +6,7 @@ A custom **Pine Script** indicator designed for TradingView to automatically ide
 
 Follow these simple steps to add the indicator to your TradingView charts:
 
-1. **Copy the Code:** Open the indicator file SupplyAndDemandZones.pine from the dist folder in this repository and copy the entire script.
+1. **Copy the Code:** Open the indicator file LSD.pine from the dist folder in this repository and copy the entire script.
 2. **Open TradingView:** Go to [TradingView](https://tradingview.com) and open any asset chart.
 3. **Open Pine Editor:** At the bottom of the screen, click on the **Pine Editor** tab.
 4. **Paste the Code:** Clear any default code currently in the editor, and paste the copied script.

@@ -1,6 +1,6 @@
 
  // ======================================================
- // SUPPLY ZONE CONFIRMATION AND TAP DETECTION
+ // SUPPLY ZONE CONFIRMATION, LIQUIDITY AND TAP
  // ======================================================
 
 if barstate.isconfirmed and array.size(supplyHighs) > 0
@@ -15,10 +15,8 @@ if barstate.isconfirmed and array.size(supplyHighs) > 0
         retestSeen = array.get(supplyRetestSeen, i)
 
         if na(afterBar)
-            // Wait until after the breakout candle.
             if bar_index > breakoutBar
-
-                // Invalidate if the close returns below the top.
+                // Invalidate if price closes below the supply top.
                 if close < candidateHigh
                     array.remove(supplyHighs, i)
                     array.remove(supplyLows, i)
@@ -27,7 +25,7 @@ if barstate.isconfirmed and array.size(supplyHighs) > 0
                     array.remove(supplyAfterBars, i)
                     array.remove(supplyRetestSeen, i)
 
-                // Confirmation: the entire candle is above the zone.
+                // Confirmation candle must be entirely above the zone.
                 else if low > candidateHigh
                     if retestSeen
                         array.remove(supplyHighs, i)
@@ -37,19 +35,16 @@ if barstate.isconfirmed and array.size(supplyHighs) > 0
                         array.remove(supplyAfterBars, i)
                         array.remove(supplyRetestSeen, i)
                     else
-                        // Start the tap window after confirmation.
                         array.set(supplyAfterBars, i, bar_index)
 
-                // Track a bearish retest before confirmation.
+                // Track bearish retests before confirmation.
                 else if bearish and low < candidateHigh
                     array.set(supplyRetestSeen, i, true)
 
         else
             barsSinceAfter = bar_index - afterBar
 
-            // The confirmation candle itself cannot be the tap.
             if barsSinceAfter > 0
-
                 // A close inside the zone invalidates it.
                 if close <= candidateHigh and close >= candidateLow
                     array.remove(supplyHighs, i)
@@ -59,7 +54,7 @@ if barstate.isconfirmed and array.size(supplyHighs) > 0
                     array.remove(supplyAfterBars, i)
                     array.remove(supplyRetestSeen, i)
 
-                // A close through the bottom invalidates it too.
+                // A close through the bottom invalidates it.
                 else if close < candidateLow
                     array.remove(supplyHighs, i)
                     array.remove(supplyLows, i)
@@ -68,18 +63,79 @@ if barstate.isconfirmed and array.size(supplyHighs) > 0
                     array.remove(supplyAfterBars, i)
                     array.remove(supplyRetestSeen, i)
 
-                // Valid tap from above:
-                // wick below the top, close above the top.
+                // Potential valid tap from above.
                 else if low < candidateHigh and close > candidateHigh
-                    box.new(
-                         left=candidateBar,
-                         top=candidateHigh,
-                         right=bar_index,
-                         bottom=candidateLow,
-                         border_color=supplyBorderColor,
-                         border_style=line.style_solid,
-                         bgcolor=supplyFillColor)
+                    liquidityFound = false
 
+                    // Find the highest high strictly between
+                    // the after-breakout candle and the tap.
+                    highestOffset = 1
+                    highestHigh = high[1]
+
+                    offset = 2
+                    while offset < barsSinceAfter
+                        if high[offset] > highestHigh
+                            highestHigh := high[offset]
+                            highestOffset := offset
+                        offset += 1
+
+                    // Search for the complete liquidity sequence
+                    // strictly BEFORE the highest-high candle.
+                    firstOffset = barsSinceAfter - 1
+
+                    while firstOffset > highestOffset + 3 and not liquidityFound
+                        // Step 1: first bearish candle.
+                        if close[firstOffset] < open[firstOffset]
+                            tempOffset = firstOffset - 1
+
+                            while tempOffset > highestOffset + 2 and not liquidityFound
+                                tempHigh = high[tempOffset]
+
+                                secondOffset = tempOffset - 1
+
+                                while secondOffset > highestOffset + 1 and not liquidityFound
+                                    // Step 2: second bearish candle.
+                                    if close[secondOffset] < open[secondOffset]
+                                        // Option A: discard this sequence if
+                                        // price breaks the temporary high
+                                        // before the second bearish candle.
+                                        sequenceBroken = false
+                                        checkOffset = tempOffset - 1
+
+                                        while checkOffset >= secondOffset
+                                            if high[checkOffset] > tempHigh
+                                                sequenceBroken := true
+                                            checkOffset -= 1
+
+                                        // Step 3: find a wick breakout AFTER
+                                        // the second bearish candle but BEFORE
+                                        // the overall highest-high candle.
+                                        if not sequenceBroken
+                                            breakOffset = secondOffset - 1
+
+                                            while breakOffset > highestOffset and not liquidityFound
+                                                if high[breakOffset] > tempHigh
+                                                    liquidityFound := true
+                                                breakOffset -= 1
+
+                                    secondOffset -= 1
+
+                                tempOffset -= 1
+
+                        firstOffset -= 1
+
+                    if liquidityFound
+                        box.new(
+                             left=candidateBar,
+                             top=candidateHigh,
+                             right=bar_index,
+                             bottom=candidateLow,
+                             border_color=supplyBorderColor,
+                             border_style=line.style_solid,
+                             bgcolor=supplyFillColor)
+
+                    // Whether valid or not, this tap completes
+                    // evaluation of this candidate.
                     array.remove(supplyHighs, i)
                     array.remove(supplyLows, i)
                     array.remove(supplyCandidateBars, i)
@@ -87,7 +143,7 @@ if barstate.isconfirmed and array.size(supplyHighs) > 0
                     array.remove(supplyAfterBars, i)
                     array.remove(supplyRetestSeen, i)
 
-                // Expire if no valid tap occurs within the window.
+                // Expire if no tap occurs within the window.
                 else if barsSinceAfter >= tapLookahead
                     array.remove(supplyHighs, i)
                     array.remove(supplyLows, i)
@@ -100,7 +156,7 @@ if barstate.isconfirmed and array.size(supplyHighs) > 0
 
 
 // ======================================================
-// DEMAND ZONE CONFIRMATION AND TAP DETECTION
+// DEMAND ZONE CONFIRMATION, LIQUIDITY AND TAP
 // ======================================================
 
 if barstate.isconfirmed and array.size(demandHighs) > 0
@@ -115,10 +171,8 @@ if barstate.isconfirmed and array.size(demandHighs) > 0
         retestSeen = array.get(demandRetestSeen, i)
 
         if na(afterBar)
-            // Wait until after the breakout candle.
             if bar_index > breakoutBar
-
-                // Invalidate if the close returns above the bottom.
+                // Invalidate if price closes above the demand bottom.
                 if close > candidateLow
                     array.remove(demandHighs, i)
                     array.remove(demandLows, i)
@@ -127,7 +181,7 @@ if barstate.isconfirmed and array.size(demandHighs) > 0
                     array.remove(demandAfterBars, i)
                     array.remove(demandRetestSeen, i)
 
-                // Confirmation: the entire candle is below the zone.
+                // Confirmation candle must be entirely below the zone.
                 else if high < candidateLow
                     if retestSeen
                         array.remove(demandHighs, i)
@@ -137,19 +191,16 @@ if barstate.isconfirmed and array.size(demandHighs) > 0
                         array.remove(demandAfterBars, i)
                         array.remove(demandRetestSeen, i)
                     else
-                        // Start the tap window after confirmation.
                         array.set(demandAfterBars, i, bar_index)
 
-                // Track a bullish retest before confirmation.
+                // Track bullish retests before confirmation.
                 else if bullish and high > candidateLow
                     array.set(demandRetestSeen, i, true)
 
         else
             barsSinceAfter = bar_index - afterBar
 
-            // The confirmation candle itself cannot be the tap.
             if barsSinceAfter > 0
-
                 // A close inside the zone invalidates it.
                 if close >= candidateLow and close <= candidateHigh
                     array.remove(demandHighs, i)
@@ -159,7 +210,7 @@ if barstate.isconfirmed and array.size(demandHighs) > 0
                     array.remove(demandAfterBars, i)
                     array.remove(demandRetestSeen, i)
 
-                // A close through the top invalidates it too.
+                // A close through the top invalidates it.
                 else if close > candidateHigh
                     array.remove(demandHighs, i)
                     array.remove(demandLows, i)
@@ -168,18 +219,79 @@ if barstate.isconfirmed and array.size(demandHighs) > 0
                     array.remove(demandAfterBars, i)
                     array.remove(demandRetestSeen, i)
 
-                // Valid tap from below:
-                // wick above the bottom, close below the bottom.
+                // Potential valid tap from below.
                 else if high > candidateLow and close < candidateLow
-                    box.new(
-                         left=candidateBar,
-                         top=candidateHigh,
-                         right=bar_index,
-                         bottom=candidateLow,
-                         border_color=demandBorderColor,
-                         border_style=line.style_solid,
-                         bgcolor=demandFillColor)
+                    liquidityFound = false
 
+                    // Find the lowest low strictly between
+                    // the after-breakout candle and the tap.
+                    lowestOffset = 1
+                    lowestLow = low[1]
+
+                    offset = 2
+                    while offset < barsSinceAfter
+                        if low[offset] < lowestLow
+                            lowestLow := low[offset]
+                            lowestOffset := offset
+                        offset += 1
+
+                    // Search for the complete liquidity sequence
+                    // strictly BEFORE the lowest-low candle.
+                    firstOffset = barsSinceAfter - 1
+
+                    while firstOffset > lowestOffset + 3 and not liquidityFound
+                        // Step 1: first bullish candle.
+                        if close[firstOffset] > open[firstOffset]
+                            tempOffset = firstOffset - 1
+
+                            while tempOffset > lowestOffset + 2 and not liquidityFound
+                                tempLow = low[tempOffset]
+
+                                secondOffset = tempOffset - 1
+
+                                while secondOffset > lowestOffset + 1 and not liquidityFound
+                                    // Step 2: second bullish candle.
+                                    if close[secondOffset] > open[secondOffset]
+                                        // Option A: discard this sequence if
+                                        // price breaks the temporary low
+                                        // before the second bullish candle.
+                                        sequenceBroken = false
+                                        checkOffset = tempOffset - 1
+
+                                        while checkOffset >= secondOffset
+                                            if low[checkOffset] < tempLow
+                                                sequenceBroken := true
+                                            checkOffset -= 1
+
+                                        // Step 3: find a wick breakout AFTER
+                                        // the second bullish candle but BEFORE
+                                        // the overall lowest-low candle.
+                                        if not sequenceBroken
+                                            breakOffset = secondOffset - 1
+
+                                            while breakOffset > lowestOffset and not liquidityFound
+                                                if low[breakOffset] < tempLow
+                                                    liquidityFound := true
+                                                breakOffset -= 1
+
+                                    secondOffset -= 1
+
+                                tempOffset -= 1
+
+                        firstOffset -= 1
+
+                    if liquidityFound
+                        box.new(
+                             left=candidateBar,
+                             top=candidateHigh,
+                             right=bar_index,
+                             bottom=candidateLow,
+                             border_color=demandBorderColor,
+                             border_style=line.style_solid,
+                             bgcolor=demandFillColor)
+
+                    // Whether valid or not, this tap completes
+                    // evaluation of this candidate.
                     array.remove(demandHighs, i)
                     array.remove(demandLows, i)
                     array.remove(demandCandidateBars, i)
@@ -187,7 +299,7 @@ if barstate.isconfirmed and array.size(demandHighs) > 0
                     array.remove(demandAfterBars, i)
                     array.remove(demandRetestSeen, i)
 
-                // Expire if no valid tap occurs within the window.
+                // Expire if no tap occurs within the window.
                 else if barsSinceAfter >= tapLookahead
                     array.remove(demandHighs, i)
                     array.remove(demandLows, i)
